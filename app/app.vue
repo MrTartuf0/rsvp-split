@@ -1,5 +1,13 @@
 <template>
-  <div class="h-screen w-screen flex bg-black text-gray-200 font-sans selection:bg-[#E62828]/30 overflow-hidden">
+  <div class="h-screen w-screen bg-bg-base text-text-main font-mono overflow-hidden">
+    <HomeView 
+      v-if="isHome" 
+      @openFile="handleOpenFile" 
+      @openText="handleOpenText" 
+      @openRecent="handleOpenFile" 
+    />
+    
+    <div v-else class="h-full w-full flex selection:bg-[#E62828]/30">
 
     <!-- SINISTRA: Viewers -->
     <div 
@@ -30,7 +38,11 @@
 
       <!-- FIX HYDRATION: Diciamo a Nuxt di renderizzarlo solo lato client -->
       <ClientOnly>
-        <PdfViewer />
+        <PdfViewer 
+          :file-to-load="selectedFile" 
+          :text-to-load="selectedText" 
+          @go-home="handleGoHome" 
+        />
         
         <!-- Opzionale: un piccolo feedback mentre carica -->
         <template #fallback>
@@ -108,8 +120,13 @@
 
         <!-- Pulsantiera -->
         <div class="flex items-center gap-10">
-          <button @click="store.reset()" class="text-[#555] hover:text-white transition">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+          <!-- Pulsante Focus Mode (Spostato a sinistra) -->
+          <button 
+            @click="isFocusMode = true" 
+            class="transition flex flex-col items-center gap-1 text-[10px] font-bold tracking-wider text-[#555] hover:text-white"
+          >
+             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
+             FOCUS
           </button>
           
           <button @click="rewind" class="text-[#555] hover:text-white transition">
@@ -137,15 +154,6 @@
              <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 14h4v4M4 10h4V6m12 8h-4v4m4-8h-4V6M10 10l-6-6m10 10l6 6m0-16l-6 6m-4 4l-6 6"></path></svg>
              ZEN
           </button>
-          
-          <!-- Pulsante Focus Mode -->
-          <button 
-            @click="isFocusMode = true" 
-            class="transition flex flex-col items-center gap-1 text-[10px] font-bold tracking-wider text-[#555] hover:text-white"
-          >
-             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
-             FOCUS
-          </button>
         </div>
 
         <!-- Slider Velocità -->
@@ -159,6 +167,14 @@
         </div>
       </div>
     </div>
+    </div>
+    
+    <CommandPalette 
+      :is-open="isPaletteOpen" 
+      :initial-query="paletteInitialQuery"
+      @close="isPaletteOpen = false" 
+      @action="handlePaletteAction" 
+    />
   </div>
 </template>
 
@@ -167,20 +183,112 @@ import { computed, ref } from 'vue'
 import { useRsvpStore } from '~/stores/rsvp'
 import { useRsvpEngine } from '~/composables/useRsvpEngine'
 import { onKeyStroke } from '@vueuse/core'
+import HomeView from '~/components/HomeView.vue'
 
 const store = useRsvpStore()
 useRsvpEngine()
 
-// Stato per la Zen Mode e Focus Mode
+// Stato Routing Semplice
+const isHome = ref(true)
+const selectedFile = ref(null)
+const selectedText = ref(null)
+
+const handleOpenFile = (fileRecord) => {
+  selectedFile.value = fileRecord.fileObj
+  selectedText.value = null
+  isHome.value = false
+}
+
+const handleOpenText = (text) => {
+  selectedText.value = text
+  selectedFile.value = null
+  isHome.value = false
+}
+
+const handleGoHome = () => {
+  isHome.value = true
+  selectedFile.value = null
+  selectedText.value = null
+  store.reset()
+  store.words = []
+  store.currentIndex = 0
+}
+
+// Stato per la Zen Mode, Focus Mode e Palette
 const isZenMode = ref(false)
 const isFocusMode = ref(false)
+const isPaletteOpen = ref(false)
+const paletteInitialQuery = ref('')
+
+const openPalette = (initialQuery = '') => {
+  paletteInitialQuery.value = initialQuery
+  isPaletteOpen.value = true
+}
+
+const handlePaletteAction = (action) => {
+  if (action.type === 'wpm') {
+    store.wpm = action.wpm
+  } else if (action.type === 'file') {
+    handleOpenFile(action.fileRecord)
+  } else if (action.type === 'goto') {
+    window.dispatchEvent(new CustomEvent('rsvp-goto-page', { detail: action.page }))
+  } else if (action.type === 'command') {
+    if (action.id === 'cmd_focus') isFocusMode.value = !isFocusMode.value
+    if (action.id === 'cmd_zen') isZenMode.value = !isZenMode.value
+    if (action.id === 'cmd_home') handleGoHome()
+    if (action.id === 'cmd_search') {
+       if (!isHome.value) {
+          // Triggera il Cmd+F gestito nativamente dal PdfViewer
+          window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f', metaKey: true }))
+       }
+    }
+  }
+}
+
+// Global Shortcuts
+if (import.meta.client) {
+  window.addEventListener('keydown', (e) => {
+    const isMac = navigator.userAgent.includes('Mac')
+    const cmdOrCtrl = isMac ? e.metaKey : e.ctrlKey
+
+    if (cmdOrCtrl) {
+      const key = e.key.toLowerCase()
+      if (key === 'p') {
+        e.preventDefault()
+        if (e.shiftKey) {
+          openPalette('>') // VSCode style: search commands
+        } else {
+          openPalette('')  // VSCode style: search files
+        }
+      } else if (key === 'o') {
+        e.preventDefault()
+        if (e.shiftKey) {
+          openPalette('') // Search loaded files
+        } else {
+          // New file picker
+          if (!isHome.value) {
+            handleGoHome()
+            setTimeout(() => {
+              const fileInput = document.querySelector('input[type="file"]')
+              if (fileInput) fileInput.click()
+            }, 100)
+          } else {
+            const fileInput = document.querySelector('input[type="file"]')
+            if (fileInput) fileInput.click()
+          }
+        }
+      }
+    }
+  })
+}
 
 // Navigazione
 const rewindWords = (count) => { store.currentIndex = Math.max(0, store.currentIndex - count) }
 const forwardWords = (count) => { store.currentIndex = Math.min(store.words.length - 1, store.currentIndex + count) }
 
 const ignoreIfInput = (e) => {
-  return ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)
+  if (isPaletteOpen.value) return true
+  return ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)
 }
 
 // Tasti
@@ -193,6 +301,11 @@ onKeyStroke('H', (e) => { if (ignoreIfInput(e)) return; rewindWords(10) })
 onKeyStroke('L', (e) => { if (ignoreIfInput(e)) return; forwardWords(10) })
 onKeyStroke('ArrowUp', (e) => { if (ignoreIfInput(e)) return; store.wpm = Math.min(1000, store.wpm + 25) })
 onKeyStroke('ArrowDown', (e) => { if (ignoreIfInput(e)) return; store.wpm = Math.max(100, store.wpm - 25) })
+onKeyStroke('K', (e) => { if (ignoreIfInput(e)) return; store.wpm = Math.min(1000, store.wpm + 25) })
+onKeyStroke('J', (e) => { if (ignoreIfInput(e)) return; store.wpm = Math.max(100, store.wpm - 25) })
+onKeyStroke('z', (e) => { if (ignoreIfInput(e)) return; isZenMode.value = !isZenMode.value })
+onKeyStroke('f', (e) => { if (ignoreIfInput(e)) return; isFocusMode.value = !isFocusMode.value })
+onKeyStroke('q', (e) => { if (ignoreIfInput(e) || isHome.value) return; handleGoHome() })
 onKeyStroke('Escape', () => { isZenMode.value = false; isFocusMode.value = false }) // Esce dallo Zen/Focus con Esc
 
 // Calcolo ORP

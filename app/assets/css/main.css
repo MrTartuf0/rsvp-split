@@ -1,5 +1,17 @@
 @import "tailwindcss";
 
+@theme {
+  --color-bg-base: #050505;
+  --color-bg-alt: #111111;
+  --color-text-main: #e5e7eb;
+  --color-text-muted: #6b7280;
+  --color-accent: #E62828;
+  --color-accent-hover: #ff3b3b;
+  
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Roboto Mono", "Fira Code", monospace;
+}
+
 :root {
   color-scheme: dark;
 }
@@ -7,5 +19,23 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background: #020617;
+  background-color: var(--color-bg-base);
+  color: var(--color-text-main);
+  font-family: var(--font-sans);
+}
+
+/* Scrollbar per Monkeytype style */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-bg-base);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-bg-alt);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
 }

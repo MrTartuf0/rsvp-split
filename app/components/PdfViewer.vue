@@ -1,89 +1,59 @@
 <template>
-  <div 
-    class="h-full flex flex-col bg-[#050505] w-full relative transition-colors duration-300"
-    :class="{ 'bg-[#1a1a1a] border-2 border-dashed border-[#E62828]': isDragging }"
-    @dragover.prevent="isDragging = true"
-    @dragleave.prevent="isDragging = false"
-    @drop.prevent="handleDrop"
-  >
-    <!-- OVERLAY DRAG & DROP -->
-    <div v-if="isDragging" class="absolute inset-0 z-50 flex items-center justify-center pointer-events-none backdrop-blur-sm">
-      <h2 class="text-3xl font-bold text-white tracking-widest uppercase bg-black/50 px-8 py-4 rounded-xl">Rilascia il file qui</h2>
-    </div>
+  <div class="h-full flex flex-col bg-bg-base relative">
 
     <!-- HEADER UNIVERSALE -->
-    <div class="px-6 py-4 border-b border-[#1a1a1a] flex-shrink-0 z-20 bg-[#050505] flex justify-between items-center gap-4">
+    <div class="px-6 py-4 border-b border-bg-alt flex-shrink-0 z-20 bg-bg-base flex justify-between items-center gap-4">
       <div class="flex items-center gap-6">
-        <h2 class="text-xs font-bold tracking-widest text-gray-500 uppercase m-0">
-          {{ viewMode.toUpperCase() }}
+        <button @click="$emit('goHome')" class="text-xs font-bold tracking-widest text-text-muted hover:text-text-main transition-colors uppercase flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+          Home
+        </button>
+        <h2 class="text-xs font-bold tracking-widest text-text-muted uppercase m-0">
+          {{ viewMode === 'idle' ? '' : viewMode.toUpperCase() }}
         </h2>
         
         <!-- Controlli Zoom (Solo PDF) -->
-        <div v-if="viewMode === 'pdf'" class="flex items-center bg-[#111] rounded-md border border-[#222] overflow-hidden">
-          <button @click="changeZoom(-0.2)" :disabled="!currentPdf" class="px-3 py-1 text-gray-400 hover:bg-[#222] hover:text-white transition-colors font-mono font-bold">-</button>
-          <span class="px-3 py-1 text-xs text-gray-300 font-mono bg-[#1a1a1a]">{{ Math.round(zoomLevel * 100) }}%</span>
-          <button @click="changeZoom(0.2)" :disabled="!currentPdf" class="px-3 py-1 text-gray-400 hover:bg-[#222] hover:text-white transition-colors font-mono font-bold">+</button>
+        <div v-if="viewMode === 'pdf'" class="flex items-center bg-bg-alt rounded-md border border-bg-alt overflow-hidden">
+          <button @click="changeZoom(-0.2)" :disabled="!currentPdf" class="px-3 py-1 text-text-muted hover:bg-[#222] hover:text-text-main transition-colors font-mono font-bold">-</button>
+          <span class="px-3 py-1 text-xs text-text-main font-mono bg-[#1a1a1a]">{{ Math.round(zoomLevel * 100) }}%</span>
+          <button @click="changeZoom(0.2)" :disabled="!currentPdf" class="px-3 py-1 text-text-muted hover:bg-[#222] hover:text-text-main transition-colors font-mono font-bold">+</button>
         </div>
       </div>
 
       <!-- Barra di Ricerca Custom RSVP (Visibile se file caricato) -->
-      <div v-if="viewMode !== 'idle' && viewMode !== 'paste'" class="flex items-center flex-1 max-w-md bg-[#111] rounded-lg border border-[#222] overflow-hidden px-2 py-1">
-        <svg class="w-4 h-4 text-gray-500 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+      <div v-if="viewMode !== 'idle'" class="flex items-center flex-1 max-w-md bg-bg-alt rounded-lg overflow-hidden px-2 py-1">
+        <svg class="w-4 h-4 text-text-muted ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
         <input 
           ref="searchInputRef"
           type="text" 
           v-model="searchQuery" 
           @keyup.enter="nextSearchResult"
-          placeholder="Cerca e sincronizza RSVP..." 
-          class="bg-transparent border-none focus:outline-none text-sm text-gray-300 px-3 py-1 w-full font-mono placeholder-gray-600"
+          placeholder="search and sync..." 
+          class="bg-transparent border-none focus:outline-none text-sm text-text-main px-3 py-1 w-full font-mono placeholder:text-text-muted"
         />
         <div v-if="searchResults.length > 0" class="flex items-center gap-2">
-          <span class="text-xs font-mono text-gray-500">{{ currentSearchIndex + 1 }} / {{ searchResults.length }}</span>
-          <button @click="prevSearchResult" class="p-1 text-gray-400 hover:text-white hover:bg-[#222] rounded"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path></svg></button>
-          <button @click="nextSearchResult" class="p-1 text-gray-400 hover:text-white hover:bg-[#222] rounded"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg></button>
+          <span class="text-xs font-mono text-text-muted">{{ currentSearchIndex + 1 }} / {{ searchResults.length }}</span>
+          <button @click="prevSearchResult" class="p-1 text-text-muted hover:text-text-main hover:bg-[#222] rounded"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path></svg></button>
+          <button @click="nextSearchResult" class="p-1 text-text-muted hover:text-text-main hover:bg-[#222] rounded"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg></button>
         </div>
       </div>
-
-      <!-- Azioni Rapide -->
+      
       <div class="flex items-center gap-3">
-        <button @click="openPasteArea" class="text-xs font-bold uppercase tracking-wider text-gray-400 hover:text-white transition-colors">
-          📝 Incolla Testo
-        </button>
-        <label class="cursor-pointer m-0 flex items-center gap-3">
-          <span v-if="fileName" class="text-xs text-gray-500 max-w-[150px] truncate">{{ fileName }}</span>
-          <span class="text-xs font-bold uppercase tracking-wider bg-[#1a1a1a] text-white py-2 px-4 rounded hover:bg-[#2a2a2a] hover:text-[#E62828] transition-colors">
-            Carica File
-          </span>
-          <input ref="fileInputRef" type="file" accept="application/pdf, text/plain, .epub, .md" @change="onFileChange" class="hidden" />
-        </label>
+        <span v-if="fileName" class="text-xs text-text-muted max-w-[150px] truncate">{{ fileName }}</span>
       </div>
     </div>
 
     <!-- AREA DI CONTENUTO PRINCIPALE -->
-    <div class="flex-1 overflow-hidden relative flex flex-col items-center bg-[#0a0a0a] w-full">
+    <div class="flex-1 overflow-hidden relative flex flex-col items-center w-full bg-bg-base text-text-main">
       
-      <!-- STATO: Incolla Testo -->
-      <div v-if="viewMode === 'paste'" class="w-full max-w-2xl mt-10 flex flex-col gap-4">
-        <h3 class="text-white font-bold tracking-wide">Incolla il tuo testo (o Markdown) qui:</h3>
-        <textarea 
-          v-model="pastedText" 
-          class="w-full h-96 bg-[#111] text-gray-300 p-6 border border-[#333] rounded-lg focus:outline-none focus:border-[#E62828] resize-none font-mono text-sm leading-relaxed"
-          placeholder="Incolla qui appunti, articoli, capitoli o codice Markdown..."
-        ></textarea>
-        <div class="flex justify-end gap-4">
-          <button @click="viewMode = 'idle'" class="px-6 py-2 text-gray-500 hover:text-white">Annulla</button>
-          <button @click="processRawText(pastedText)" class="px-6 py-2 bg-[#E62828] text-white font-bold rounded hover:bg-red-600">Inizia Lettura</button>
-        </div>
-      </div>
-
       <!-- STATO: Testo Semplice o Markdown -->
-      <div v-else-if="viewMode === 'text'" class="w-full h-full overflow-y-auto custom-scrollbar p-4 flex justify-center">
-        <div class="w-full max-w-3xl mt-4 p-8 bg-[#111] rounded-xl shadow-2xl text-gray-300 text-lg leading-relaxed font-serif whitespace-pre-wrap markdown-container" v-html="markdownHtml" @click="handleMarkdownClick" ref="markdownContainerRef">
+      <div v-if="viewMode === 'text'" class="w-full h-full overflow-y-auto custom-scrollbar p-4 flex justify-center">
+        <div class="w-full max-w-3xl mt-4 p-8 bg-bg-alt rounded-xl shadow-2xl text-text-main text-lg leading-relaxed font-mono whitespace-pre-wrap markdown-container" v-html="markdownHtml" @click="handleMarkdownClick" ref="markdownContainerRef">
         </div>
       </div>
 
       <!-- STATO: EPUB -->
-      <div v-else-if="viewMode === 'epub'" class="w-full h-full relative bg-white shadow-2xl overflow-hidden flex">
+      <div v-else-if="viewMode === 'epub'" class="w-full h-full relative bg-bg-base shadow-2xl overflow-hidden flex">
         
         <!-- SIDEBAR INDICE (a scomparsa) -->
         <div 
@@ -156,7 +126,7 @@
         <div class="flex-1 w-full h-full relative flex flex-col items-center overflow-y-auto custom-scrollbar p-4" id="pdf-scroll-container" @scroll="onPdfScroll">
            
            <!-- PULSANTE SIDEBAR MINIMALE PDF -->
-           <div class="sticky top-6 left-6 z-30 w-full flex justify-start pointer-events-none mb-8">
+           <div class="sticky top-6 left-6 z-30 w-full flex justify-start pointer-events-none h-0 overflow-visible">
               <button @click="showSidebar = !showSidebar" class="text-gray-400 hover:text-[#E62828] bg-[#111]/80 hover:bg-[#222] backdrop-blur-sm p-3 rounded-xl shadow-lg border border-[#222] transition-all pointer-events-auto ml-6">
                  <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"></path></svg>
               </button>
@@ -175,8 +145,8 @@
              <div class="absolute top-0 left-0 w-full h-full z-10">
                 <div :id="'text-layer-' + pageData.pageNumber" class="textLayer"></div>
                 <template v-if="pageData.rendered">
-                  <div v-if="hasActiveWord(pageData)" id="active-pdf-word" class="absolute bg-[#E62828]/40 pointer-events-none rounded-[2px]" :style="getActiveWordStyle(pageData)"></div>
-                  <div v-for="(box, bIdx) in pageData.hitboxes" :key="bIdx" @click="onWordClick(box.index)" class="absolute cursor-pointer hover:bg-yellow-400/30 rounded-[2px]" :style="{ left: box.left + 'px', top: box.top + 'px', width: box.width + 'px', height: box.height + 'px' }"></div>
+                  <div v-if="hasActiveWord(pageData)" id="active-pdf-word" class="absolute bg-[#E62828]/40 pointer-events-none rounded-[2px] z-10" :style="getActiveWordStyle(pageData)"></div>
+                  <div v-for="(box, bIdx) in pageData.hitboxes" :key="bIdx" @click="onWordClick(box.index)" class="absolute cursor-pointer hover:bg-yellow-400/30 rounded-[2px] z-10" :style="{ left: box.left + 'px', top: box.top + 'px', width: box.width + 'px', height: box.height + 'px' }"></div>
                 </template>
              </div>
            </div>
@@ -186,7 +156,7 @@
       <!-- STATO: Vuoto -->
       <div v-else-if="viewMode === 'idle'" class="m-auto text-center text-gray-600 flex flex-col items-center gap-4">
         <svg class="w-16 h-16 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-        <p>Trascina qui un PDF, un file TXT, MD o un EPUB</p>
+        <p>In attesa di dati...</p>
       </div>
 
     </div>
@@ -200,9 +170,21 @@ import { marked } from 'marked'
 
 const store = useRsvpStore()
 
+const props = defineProps({
+  fileToLoad: {
+    type: Object,
+    default: null
+  },
+  textToLoad: {
+    type: String,
+    default: null
+  }
+})
+
+const emit = defineEmits(['goHome'])
+
 // Stati Globali
 const viewMode = ref('idle') 
-const isDragging = ref(false)
 const isLoading = ref(false)
 const fileName = ref('')
 
@@ -211,7 +193,6 @@ const searchQuery = ref('')
 const searchResults = ref([])
 const currentSearchIndex = ref(0)
 const searchInputRef = ref(null)
-const fileInputRef = ref(null)
 
 // Event listeners spostati in basso
 watch(searchQuery, (newVal) => {
@@ -255,7 +236,6 @@ const currentPdf = ref(null)
 const zoomLevel = ref(1.0)
 
 // Stati Testo/Markdown
-const pastedText = ref('')
 const markdownHtml = ref('')
 const markdownContainerRef = ref(null)
 
@@ -312,7 +292,13 @@ const showEpubSidebar = ref(false)
 const setCanvasRef = (el, index) => { if (el) canvasRefs.value[index] = el }
 const onWordClick = (globalIndex) => {
   store.currentIndex = globalIndex
-  if (store.isPlaying) store.isPlaying = false 
+  if (store.isPlaying) store.isPlaying = false
+  
+  // Togli il focus dall'iframe o dall'elemento cliccato per ripristinare le shortcut globali
+  if (document.activeElement) {
+    document.activeElement.blur()
+  }
+  window.focus()
 }
 
 const hasActiveWord = (pageData) => {
@@ -328,21 +314,10 @@ const getActiveWordStyle = (pageData) => {
   return { left: box.left + 'px', top: box.top + 'px', width: box.width + 'px', height: box.height + 'px' }
 }
 
-const handleDrop = (e) => {
-  isDragging.value = false
-  const file = e.dataTransfer.files[0]
-  if (file) elaboraFile(file)
-}
-
-const onFileChange = (event) => {
-  const file = event.target.files[0]
-  if (file) elaboraFile(file)
-}
-
 const elaboraFile = async (file) => {
   fileName.value = file.name
 
-  if (file.type === 'application/pdf') {
+  if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
     viewMode.value = 'pdf'
     await loadPdf(file)
   } 
@@ -359,6 +334,29 @@ const elaboraFile = async (file) => {
     alert("Formato non supportato. Usa PDF, TXT, MD o EPUB.")
   }
 }
+
+onMounted(async () => {
+  await nextTick()
+  if (props.fileToLoad) {
+    elaboraFile(props.fileToLoad)
+  } else if (props.textToLoad) {
+    processRawText(props.textToLoad)
+  }
+})
+
+watch(() => props.fileToLoad, async (newVal) => {
+  if (newVal) {
+    await nextTick()
+    elaboraFile(newVal)
+  }
+})
+
+watch(() => props.textToLoad, async (newVal) => {
+  if (newVal) {
+    await nextTick()
+    processRawText(newVal)
+  }
+})
 
 // ------------------------------------------------------------------
 // MOTORE EPUB
@@ -785,7 +783,7 @@ const renderPages = async () => {
 
 const handleKeyDown = (e) => {
   if (e.key === 'Escape') {
-    if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
+    if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
       document.activeElement.blur()
       return
     }
@@ -794,12 +792,6 @@ const handleKeyDown = (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'f') {
     e.preventDefault()
     if (searchInputRef.value) searchInputRef.value.focus()
-    return
-  }
-  
-  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'o') {
-    e.preventDefault()
-    if (fileInputRef.value) fileInputRef.value.click()
     return
   }
 
@@ -826,6 +818,12 @@ const handleKeyDown = (e) => {
   } else if (e.key === 'd' && viewMode.value === 'pdf') {
     const nextPage = Math.min(pages.value.length, currentPdfPage.value + 1)
     goToPdfPage(nextPage)
+  } else if (e.key === 'u' && viewMode.value === 'epub') {
+    if (epubRendition.value) epubRendition.value.prev()
+  } else if (e.key === 'd' && viewMode.value === 'epub') {
+    if (epubRendition.value) epubRendition.value.next()
+  } else if (e.key === 'n' && viewMode.value === 'epub') {
+    showEpubSidebar.value = !showEpubSidebar.value
   }
 }
 
@@ -887,12 +885,25 @@ const jumpLine = (direction) => {
 
 }
 
+const handleGotoPage = (e) => {
+  const pageNum = e.detail
+  if (viewMode.value === 'pdf') {
+    goToPdfPage(pageNum)
+  } else if (viewMode.value === 'epub') {
+    // Basic fallback for epub (usually relies on cfi, but we try percentage or spine index if possible)
+    // Note: pageNum for epub without a generated page list is inaccurate, 
+    // but we can try jumping by index if we had one. For now just ignore or try spine.
+  }
+}
+
 onMounted(() => {
   window.addEventListener('keydown', handleKeyDown)
+  window.addEventListener('rsvp-goto-page', handleGotoPage)
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleKeyDown)
+  window.removeEventListener('rsvp-goto-page', handleGotoPage)
 })
 </script>
 
