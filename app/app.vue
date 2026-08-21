@@ -156,6 +156,16 @@
           </button>
         </div>
 
+        <!-- Statistiche di Lettura -->
+        <div v-if="store.words.length > 0" class="flex flex-wrap items-center justify-center gap-6 text-[10px] font-bold text-[#555] tracking-[0.1em] uppercase mt-2 mb-2 w-full px-4 text-center">
+          <span>Words: <span class="text-white">{{ store.currentIndex + 1 }}</span> / {{ store.words.length }}</span>
+          <span v-if="store.totalPages > 0">
+             <span v-if="store.currentChapterName" class="text-white">Ch: {{ store.currentChapterName }}</span>
+             <span v-else>Page: <span class="text-white">{{ store.currentPage }}</span> / {{ store.totalPages }}</span>
+          </span>
+          <span>Time left: <span class="text-white">{{ timeRemainingStr }}</span></span>
+        </div>
+
         <!-- Slider Velocità -->
         <div class="w-full max-w-md">
           <div class="flex justify-between items-end mb-2">
@@ -213,6 +223,16 @@ const handleGoHome = () => {
   store.words = []
   store.currentIndex = 0
 }
+
+// Statistiche
+const timeRemainingStr = computed(() => {
+  if (store.words.length === 0 || store.wpm === 0) return '0m'
+  const remainingWords = store.words.length - store.currentIndex
+  const minutes = Math.floor(remainingWords / store.wpm)
+  const seconds = Math.floor((remainingWords % store.wpm) / (store.wpm / 60))
+  if (minutes > 0) return `${minutes}m ${seconds}s`
+  return `${seconds}s`
+})
 
 // Stato per la Zen Mode, Focus Mode e Palette
 const isZenMode = ref(false)
@@ -304,7 +324,7 @@ onKeyStroke('ArrowDown', (e) => { if (ignoreIfInput(e)) return; store.wpm = Math
 onKeyStroke('K', (e) => { if (ignoreIfInput(e)) return; store.wpm = Math.min(1000, store.wpm + 25) })
 onKeyStroke('J', (e) => { if (ignoreIfInput(e)) return; store.wpm = Math.max(100, store.wpm - 25) })
 onKeyStroke('z', (e) => { if (ignoreIfInput(e)) return; isZenMode.value = !isZenMode.value })
-onKeyStroke('f', (e) => { if (ignoreIfInput(e)) return; isFocusMode.value = !isFocusMode.value })
+onKeyStroke('f', (e) => { if (ignoreIfInput(e)) return; openPalette('f ') })
 onKeyStroke('q', (e) => { if (ignoreIfInput(e) || isHome.value) return; handleGoHome() })
 onKeyStroke('Escape', () => { isZenMode.value = false; isFocusMode.value = false }) // Esce dallo Zen/Focus con Esc
 

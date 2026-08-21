@@ -82,8 +82,8 @@
         <div class="flex-1 w-full h-full relative flex flex-col">
            
            <!-- PULSANTE SIDEBAR MINIMALE -->
-           <div class="absolute top-6 left-6 z-30">
-              <button @click="showSidebar = !showSidebar" class="text-gray-500 hover:text-[#E62828] bg-white/80 hover:bg-white backdrop-blur-sm p-3 rounded-xl shadow-lg border border-gray-100 transition-all">
+           <div class="absolute top-10 left-6 z-30" v-if="!showSidebar">
+              <button @click="showSidebar = !showSidebar" class="text-gray-500 hover:text-[#E62828] bg-[#111]/80 hover:bg-[#222] backdrop-blur-sm p-3 rounded-xl shadow-lg border border-[#222] transition-all">
                  <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"></path></svg>
               </button>
            </div>
@@ -93,7 +93,7 @@
              <span class="text-[#E62828] text-sm font-mono uppercase tracking-widest animate-pulse">Estrazione in corso...</span>
            </div>
            
-           <div ref="epubContainerRef" class="epub-container w-full flex-1 p-4 pt-24 pb-10 overflow-hidden"></div>
+           <div ref="epubContainerRef" class="epub-container w-full flex-1 p-4 pt-6 pb-10 overflow-hidden"></div>
         </div>
       </div>
 
@@ -114,23 +114,28 @@
                 v-for="(pageData, index) in pages" 
                 :key="'nav-' + index" 
                 @click="goToPdfPage(pageData.pageNumber)"
-                class="w-full text-left py-3 px-4 rounded-lg hover:bg-[#222] hover:text-white transition-all text-sm leading-tight border-l-2 border-transparent"
+                class="group w-full text-left py-3 px-3 rounded-lg hover:bg-[#222] hover:text-white transition-all flex items-center gap-4 text-sm leading-tight border-l-2 border-transparent"
                 :class="{ 'bg-[#E62828]/10 text-[#E62828] border-[#E62828] font-bold': currentPdfPage === pageData.pageNumber }"
               >
-                Pagina {{ pageData.pageNumber }}
+                <span class="w-8 text-center text-lg font-bold text-gray-500 shrink-0 group-hover:text-white transition-colors">{{ pageData.pageNumber }}</span>
+                <div class="w-48 h-64 bg-white shrink-0 shadow-sm overflow-hidden flex items-center justify-center rounded">
+                   <canvas :ref="el => setThumbRef(el, index)" class="w-full h-full object-contain"></canvas>
+                </div>
               </button>
            </div>
         </div>
 
         <!-- AREA LETTURA PDF -->
-        <div class="flex-1 w-full h-full relative flex flex-col items-center overflow-y-auto custom-scrollbar p-4" id="pdf-scroll-container" @scroll="onPdfScroll">
+        <div class="flex-1 w-full h-full relative flex flex-col">
            
            <!-- PULSANTE SIDEBAR MINIMALE PDF -->
-           <div class="sticky top-6 left-6 z-30 w-full flex justify-start pointer-events-none h-0 overflow-visible">
-              <button @click="showSidebar = !showSidebar" class="text-gray-400 hover:text-[#E62828] bg-[#111]/80 hover:bg-[#222] backdrop-blur-sm p-3 rounded-xl shadow-lg border border-[#222] transition-all pointer-events-auto ml-6">
+           <div class="absolute top-10 left-6 z-50" v-if="!showSidebar">
+              <button @click="showSidebar = !showSidebar" class="text-gray-400 hover:text-[#E62828] bg-[#111]/80 hover:bg-[#222] backdrop-blur-sm p-3 rounded-xl shadow-lg border border-[#222] transition-all">
                  <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"></path></svg>
               </button>
            </div>
+
+           <div class="w-full h-full relative flex flex-col items-center overflow-y-auto custom-scrollbar p-4" id="pdf-scroll-container" @scroll="onPdfScroll">
 
            <div v-if="isLoading" class="text-[#E62828] text-sm animate-pulse mb-8 font-mono uppercase tracking-widest">Elaborazione Spaziale...</div>
            
@@ -149,6 +154,7 @@
                   <div v-for="(box, bIdx) in pageData.hitboxes" :key="bIdx" @click="onWordClick(box.index)" class="absolute cursor-pointer hover:bg-yellow-400/30 rounded-[2px] z-10" :style="{ left: box.left + 'px', top: box.top + 'px', width: box.width + 'px', height: box.height + 'px' }"></div>
                 </template>
              </div>
+           </div>
            </div>
         </div>
       </div>
@@ -232,6 +238,7 @@ const showSidebar = ref(false)
 // Stati PDF
 const pages = ref([])
 const canvasRefs = ref([])
+const thumbRefs = ref([])
 const currentPdf = ref(null)
 const zoomLevel = ref(1.0)
 
@@ -245,6 +252,7 @@ const currentEpub = ref(null)
 const epubRendition = ref(null)
 const epubToc = ref([])
 const currentChapterName = ref('')
+const epubFontSize = ref(100)
 
 const goToPdfPage = (pageNumber) => {
   const el = document.getElementById('pdf-page-' + pageNumber)
@@ -290,6 +298,31 @@ const readingProgress = ref(0)
 const showEpubSidebar = ref(false)
 
 const setCanvasRef = (el, index) => { if (el) canvasRefs.value[index] = el }
+const setThumbRef = (el, index) => { if (el) thumbRefs.value[index] = el }
+
+const renderThumbnails = () => {
+  if (viewMode.value !== 'pdf') return
+  for (let i = 0; i < pages.value.length; i++) {
+    const thumbCanvas = thumbRefs.value[i]
+    const mainCanvas = canvasRefs.value[i]
+    if (thumbCanvas && mainCanvas && pages.value[i].rendered) {
+      const aspectRatio = mainCanvas.width / mainCanvas.height
+      thumbCanvas.width = 200
+      thumbCanvas.height = thumbCanvas.width / aspectRatio
+      const ctx = thumbCanvas.getContext('2d')
+      ctx.drawImage(mainCanvas, 0, 0, thumbCanvas.width, thumbCanvas.height)
+    }
+  }
+}
+
+watch(showSidebar, (newVal) => {
+  if (newVal && viewMode.value === 'pdf') {
+    nextTick(() => {
+      renderThumbnails()
+    })
+  }
+})
+
 const onWordClick = (globalIndex) => {
   store.currentIndex = globalIndex
   if (store.isPlaying) store.isPlaying = false
@@ -355,6 +388,22 @@ watch(() => props.textToLoad, async (newVal) => {
   if (newVal) {
     await nextTick()
     processRawText(newVal)
+  }
+})
+
+// Sincronizza stato PDF nello store
+watch([currentPdfPage, () => pages.value.length], ([page, total]) => {
+  if (viewMode.value === 'pdf') {
+    store.currentPage = page
+    store.totalPages = total
+  }
+})
+
+// Sincronizza stato EPUB nello store
+watch([currentChapterName, () => epubToc.value.length], ([name, total]) => {
+  if (viewMode.value === 'epub') {
+    store.currentChapterName = name
+    store.totalPages = total
   }
 })
 
@@ -520,7 +569,6 @@ const loadEpub = async (file) => {
       
       // Aggiungi stili
       contents.addStylesheetRules([
-        [".epub-word", ["transition", "background-color 0.1s ease"]],
         [".epub-word:hover", ["background-color", "rgba(250, 204, 21, 0.3)"]],
         [".epub-word.active-word", ["background-color", "rgba(230, 40, 40, 0.4)"], ["border-radius", "4px"]]
       ])
@@ -628,11 +676,18 @@ watch(() => store.currentIndex, (newIdx, oldIdx) => {
         newSpan.classList.add('active-word')
         
         // Auto-Scroll Intelligente per EPUB
-        if (store.isPlaying && targetContents) {
-          const rect = newSpan.getBoundingClientRect()
-          const viewportHeight = targetContents.window.innerHeight || window.innerHeight
+        if (targetContents) {
+          const spanRect = newSpan.getBoundingClientRect()
+          let absoluteTop = spanRect.top
+          
+          const iframe = targetContents.window ? targetContents.window.frameElement : null
+          if (iframe) {
+            absoluteTop += iframe.getBoundingClientRect().top
+          }
+          
+          const viewportHeight = window.innerHeight
           // Se la parola sta per uscire dalla vista (top 20% o bottom 20%), centra
-          if (rect.top < viewportHeight * 0.2 || rect.top > viewportHeight * 0.8) {
+          if (absoluteTop < viewportHeight * 0.2 || absoluteTop > viewportHeight * 0.8) {
              newSpan.scrollIntoView({ behavior: 'smooth', block: 'center' })
           }
         }
@@ -767,6 +822,17 @@ const renderPages = async () => {
       await p.pageObject.render({ canvasContext: canvasRefs.value[i].getContext('2d'), transform: p.transform, viewport: p.viewport }).promise; 
       p.rendered = true 
       
+      // Update thumbnail if sidebar is open
+      if (showSidebar.value) {
+         const thumbCanvas = thumbRefs.value[i]
+         if (thumbCanvas) {
+            const aspectRatio = canvasRefs.value[i].width / canvasRefs.value[i].height
+            thumbCanvas.width = 200
+            thumbCanvas.height = 200 / aspectRatio
+            thumbCanvas.getContext('2d').drawImage(canvasRefs.value[i], 0, 0, thumbCanvas.width, thumbCanvas.height)
+         }
+      }
+      
       const textLayerDiv = document.getElementById('text-layer-' + p.pageNumber)
       if (textLayerDiv && p.textContent && pdfjsLib && pdfjsLib.renderTextLayer) {
         textLayerDiv.innerHTML = '' // Clear if re-rendering
@@ -812,6 +878,18 @@ const handleKeyDown = (e) => {
     jumpLine(1)
   } else if (e.key === 'k') {
     jumpLine(-1)
+  } else if (e.key === '-' || e.key === '_') {
+    if (viewMode.value === 'pdf') changeZoom(-0.1)
+    else if (viewMode.value === 'epub') {
+       epubFontSize.value = Math.max(50, epubFontSize.value - 10)
+       if (epubRendition.value) epubRendition.value.themes.fontSize(epubFontSize.value + '%')
+    }
+  } else if (e.key === '=' || e.key === '+') {
+    if (viewMode.value === 'pdf') changeZoom(0.1)
+    else if (viewMode.value === 'epub') {
+       epubFontSize.value = Math.min(300, epubFontSize.value + 10)
+       if (epubRendition.value) epubRendition.value.themes.fontSize(epubFontSize.value + '%')
+    }
   } else if (e.key === 'u' && viewMode.value === 'pdf') {
     const prevPage = Math.max(1, currentPdfPage.value - 1)
     goToPdfPage(prevPage)

@@ -6,6 +6,9 @@ export const useRsvpStore = defineStore('rsvp', {
     currentIndex: 0,
     isPlaying: false,
     wpm: 300,
+    currentPage: 0,
+    totalPages: 0,
+    currentChapterName: '',
   }),
   actions: {
     loadText(text: string) {

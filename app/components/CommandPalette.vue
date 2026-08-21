@@ -134,6 +134,14 @@ const filteredResults = computed(() => {
     return cmds.filter(opt => opt.title.toLowerCase().includes(searchCmd) || (opt.subtitle && opt.subtitle.toLowerCase().includes(searchCmd)))
   }
 
+  // File Search Mode (f prefix)
+  if (q.startsWith('f ')) {
+    const searchFile = q.substring(2).trim()
+    const files = allOptions.value.filter(o => o.type === 'file')
+    if (!searchFile) return files
+    return files.filter(opt => opt.title.toLowerCase().includes(searchFile) || (opt.subtitle && opt.subtitle.toLowerCase().includes(searchFile)))
+  }
+
   // Se la query è un numero (senza prefissi), proponi di settare i WPM
   if (q && !isNaN(q)) {
     return [{
