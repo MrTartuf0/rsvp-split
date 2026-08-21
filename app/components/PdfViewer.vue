@@ -63,18 +63,56 @@
       </div>
 
       <!-- STATO: EPUB -->
-      <div v-else-if="viewMode === 'epub'" class="w-full h-full relative bg-white shadow-2xl overflow-hidden rounded-xl">
-        <div v-if="isLoading" class="absolute inset-0 z-50 flex items-center justify-center bg-white/80 text-[#E62828] text-sm font-mono uppercase tracking-widest">
-          Estrazione capitoli in corso...
+      <div v-else-if="viewMode === 'epub'" class="w-full h-full relative bg-white shadow-2xl overflow-hidden rounded-xl flex">
+        
+        <!-- SIDEBAR INDICE (a scomparsa) -->
+        <div 
+           class="absolute top-0 left-0 h-full bg-[#111] text-gray-300 w-80 z-40 transform transition-transform duration-300 shadow-2xl flex flex-col border-r border-[#222]"
+           :class="showEpubSidebar ? 'translate-x-0' : '-translate-x-full'"
+        >
+           <div class="p-6 border-b border-[#222] flex justify-between items-center bg-[#050505]">
+              <h3 class="text-white font-bold tracking-wider uppercase text-sm">Indice Capitoli</h3>
+              <button @click="showEpubSidebar = false" class="text-gray-500 hover:text-[#E62828] font-bold text-xl leading-none">×</button>
+           </div>
+           <div class="flex-1 overflow-y-auto p-4 space-y-1 custom-scrollbar">
+              <button 
+                v-for="item in epubToc" 
+                :key="item.id" 
+                @click="goToEpubChapter(item.href)"
+                class="w-full text-left py-3 px-4 rounded-lg hover:bg-[#222] hover:text-white transition-all text-sm leading-tight border-l-2 border-transparent"
+                :class="{ 'bg-[#E62828]/10 text-[#E62828] border-[#E62828] font-bold': currentChapterName === item.label }"
+              >
+                {{ item.label.trim() }}
+              </button>
+              <div v-if="epubToc.length === 0" class="text-center text-gray-600 mt-10 text-sm">Nessun indice trovato</div>
+           </div>
         </div>
-        
-        <!-- Qui epub.js inietterà l'Iframe del libro -->
-        <div ref="epubContainerRef" class="w-full h-full p-4"></div>
-        
-        <!-- Controlli Pagine EPUB -->
-        <div class="absolute bottom-6 left-0 w-full flex justify-center gap-6 z-20 pointer-events-none">
-          <button @click="prevEpubPage" class="pointer-events-auto px-6 py-2 bg-[#111]/90 text-white font-bold tracking-wider rounded-full hover:bg-[#E62828] transition-colors shadow-lg shadow-black/50">&larr; Prec</button>
-          <button @click="nextEpubPage" class="pointer-events-auto px-6 py-2 bg-[#111]/90 text-white font-bold tracking-wider rounded-full hover:bg-[#E62828] transition-colors shadow-lg shadow-black/50">Succ &rarr;</button>
+
+        <!-- AREA LETTURA -->
+        <div class="flex-1 w-full h-full relative flex flex-col">
+           
+           <!-- TOP BAR FLUTTUANTE -->
+           <div class="absolute top-4 left-4 right-4 z-30 flex items-center gap-4 bg-white/95 backdrop-blur-md px-4 py-3 rounded-2xl shadow-lg border border-gray-100 transition-all">
+              <button @click="showEpubSidebar = !showEpubSidebar" class="text-gray-600 hover:text-[#E62828] hover:bg-gray-100 p-2 rounded-xl transition-colors">
+                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"></path></svg>
+              </button>
+              
+              <div class="flex-1 flex flex-col justify-center overflow-hidden">
+                 <span class="text-xs font-bold text-gray-800 uppercase tracking-widest truncate">{{ currentChapterName || fileName }}</span>
+                 <div class="w-full h-1.5 bg-gray-200 rounded-full mt-1.5 overflow-hidden">
+                    <div class="h-full bg-[#E62828] transition-all duration-300 rounded-full" :style="{ width: readingProgress + '%' }"></div>
+                 </div>
+              </div>
+              
+              <span class="text-xs font-mono font-bold text-[#E62828] w-12 text-right">{{ Math.round(readingProgress) }}%</span>
+           </div>
+
+           <div v-if="isLoading" class="absolute inset-0 z-50 flex flex-col items-center justify-center bg-white/95">
+             <div class="w-12 h-12 border-4 border-gray-200 border-t-[#E62828] rounded-full animate-spin mb-4"></div>
+             <span class="text-[#E62828] text-sm font-mono uppercase tracking-widest animate-pulse">Estrazione in corso...</span>
+           </div>
+           
+           <div ref="epubContainerRef" class="epub-container w-full flex-1 p-4 pt-24 pb-10 overflow-hidden"></div>
         </div>
       </div>
 
@@ -136,6 +174,10 @@ const markdownContainerRef = ref(null)
 const epubContainerRef = ref(null)
 const currentEpub = ref(null)
 const epubRendition = ref(null)
+const epubToc = ref([])
+const currentChapterName = ref('')
+const readingProgress = ref(0)
+const showEpubSidebar = ref(false)
 
 const setCanvasRef = (el, index) => { if (el) canvasRefs.value[index] = el }
 const onWordClick = (globalIndex) => {
@@ -248,7 +290,8 @@ const loadEpub = async (file) => {
     
     epubRendition.value = currentEpub.value.renderTo(epubContainerRef.value, {
       manager: 'continuous',
-      flow: 'scrolled',
+      flow: 'scrolled-doc',
+      snap: false,
       width: '100%',
       height: '100%',
       allowScriptedContent: true
@@ -256,6 +299,13 @@ const loadEpub = async (file) => {
     
     // ASPETTIAMO CHE L'EPUB ABBIA CARICATO LA SUA STRUTTURA
     await currentEpub.value.ready
+    
+    // Recupera l'Indice
+    const nav = await currentEpub.value.loaded.navigation
+    epubToc.value = nav.toc || []
+    
+    // Genera locazioni in background per la barra di progresso (usiamo 1600 per calcolo standard)
+    currentEpub.value.locations.generate(1600).catch(() => {})
     
     let fullWordArray = []
     let currentIndex = 0
@@ -342,9 +392,9 @@ const loadEpub = async (file) => {
       
       // Aggiungi stili
       contents.addStylesheetRules([
-        [".epub-word", ["cursor", "pointer"], ["border-radius", "2px"], ["transition", "background-color 0.2s"]],
+        [".epub-word", ["transition", "background-color 0.1s ease"]],
         [".epub-word:hover", ["background-color", "rgba(250, 204, 21, 0.3)"]],
-        [".epub-word.active-word", ["background-color", "#E62828"], ["color", "white"], ["padding", "0 4px"]]
+        [".epub-word.active-word", ["background-color", "rgba(230, 40, 40, 0.4)"], ["border-radius", "4px"]]
       ])
 
       // Avvolgi le parole in Span cliccabili
@@ -358,6 +408,19 @@ const loadEpub = async (file) => {
     })
 
     await epubRendition.value.display()
+    
+    // Ascolta gli spostamenti per aggiornare la top bar
+    epubRendition.value.on('relocated', (location) => {
+      // Aggiorna titolo capitolo
+      const startHref = location.start.href
+      const navItem = epubToc.value.find(item => startHref.includes(item.href) || item.href.includes(startHref))
+      if (navItem) currentChapterName.value = navItem.label
+      
+      // Aggiorna progresso
+      if (currentEpub.value.locations.length() > 0) {
+        readingProgress.value = currentEpub.value.locations.percentageFromCfi(location.start.cfi) * 100
+      }
+    })
 
   } catch (error) {
     console.error("Errore caricamento EPUB:", error)
@@ -369,6 +432,12 @@ const loadEpub = async (file) => {
 
 const prevEpubPage = () => { if (epubRendition.value) epubRendition.value.prev() }
 const nextEpubPage = () => { if (epubRendition.value) epubRendition.value.next() }
+const goToEpubChapter = (href) => {
+  if (epubRendition.value) {
+    epubRendition.value.display(href)
+    showEpubSidebar.value = false
+  }
+}
 
 // ------------------------------------------------------------------
 // MOTORE TESTO SEMPLICE & MARKDOWN
@@ -409,14 +478,34 @@ watch(() => store.currentIndex, (newIdx, oldIdx) => {
   if (viewMode.value === 'epub' && epubRendition.value) {
     const contentsArr = epubRendition.value.getContents()
     if (contentsArr && contentsArr.length > 0) {
-      const iframeDoc = contentsArr[0].document
-      if (oldIdx !== null && oldIdx !== undefined) {
-        const oldSpan = iframeDoc.querySelector(`.epub-word[data-index="${oldIdx}"]`)
-        if (oldSpan) oldSpan.classList.remove('active-word')
+      let oldSpan = null
+      let newSpan = null
+      let targetContents = null
+      
+      for (const contents of contentsArr) {
+        const iframeDoc = contents.document
+        if (!oldSpan && oldIdx !== null && oldIdx !== undefined) {
+          oldSpan = iframeDoc.querySelector(`.epub-word[data-index="${oldIdx}"]`)
+        }
+        if (!newSpan) {
+          newSpan = iframeDoc.querySelector(`.epub-word[data-index="${newIdx}"]`)
+          if (newSpan) targetContents = contents
+        }
       }
-      const newSpan = iframeDoc.querySelector(`.epub-word[data-index="${newIdx}"]`)
+      
+      if (oldSpan) oldSpan.classList.remove('active-word')
       if (newSpan) {
         newSpan.classList.add('active-word')
+        
+        // Auto-Scroll Intelligente
+        if (store.isPlaying && targetContents) {
+          const rect = newSpan.getBoundingClientRect()
+          const viewportHeight = targetContents.window.innerHeight || window.innerHeight
+          // Se la parola sta per uscire dalla vista (top 20% o bottom 20%), centra
+          if (rect.top < viewportHeight * 0.2 || rect.top > viewportHeight * 0.8) {
+             newSpan.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          }
+        }
       }
     }
   }
@@ -539,4 +628,10 @@ const renderPages = async () => {
 .markdown-container blockquote { border-left: 4px solid #333; padding-left: 1rem; color: #888; font-style: italic; }
 .markdown-container code { background-color: #222; padding: 0.2rem 0.4rem; border-radius: 0.25rem; font-family: monospace; }
 .markdown-container pre { background-color: #222; padding: 1rem; border-radius: 0.5rem; overflow-x: auto; margin-bottom: 1rem; }
+.epub-container {
+  overflow-anchor: none;
+}
+.epub-container * {
+  overflow-anchor: none;
+}
 </style>

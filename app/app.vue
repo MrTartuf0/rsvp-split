@@ -1,12 +1,33 @@
 <template>
   <div class="h-screen w-screen flex bg-black text-gray-200 font-sans selection:bg-[#E62828]/30 overflow-hidden">
 
-    <!-- SINISTRA: Visualizzatore PDF -->
-    <!-- Transizione fluida per la Zen Mode -->
+    <!-- SINISTRA: Viewers -->
     <div 
-      class="h-full border-[#1a1a1a] transition-all duration-500 ease-in-out"
-      :class="isZenMode ? 'w-0 opacity-0 overflow-hidden border-none' : 'w-1/2 opacity-100 border-r'"
+      class="h-full bg-white relative transition-all duration-500 overflow-hidden flex-shrink-0 flex flex-col"
+      :class="isZenMode ? 'w-0 opacity-0 border-none' : (isFocusMode ? 'w-full' : 'w-1/2 border-r')"
     >
+      <!-- Pulsante Esci da Focus (visibile solo in Focus Mode) -->
+      <button 
+        v-if="isFocusMode" 
+        @click="isFocusMode = false"
+        class="absolute bottom-8 right-8 z-50 bg-[#E62828] text-white shadow-xl px-4 py-2 rounded-full flex items-center gap-2 text-xs font-bold tracking-widest uppercase transition-transform hover:scale-105"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+        Esci da Focus
+      </button>
+
+      <!-- Pannellino Play/Pause per Focus Mode -->
+      <div v-if="isFocusMode" class="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-50 bg-[#111] text-white shadow-2xl px-6 py-3 rounded-full flex items-center gap-6">
+         <button @click="rewind" class="text-gray-400 hover:text-white"><svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M18 18l-8-6 8-6v12zm-10 0l-8-6 8-6v12z"/></svg></button>
+         <button @click="store.togglePlay()" class="text-white hover:text-[#E62828] transform hover:scale-110 transition-all">
+            <svg v-if="!store.isPlaying" class="w-6 h-6 pl-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+            <svg v-else class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+         </button>
+         <button @click="forward" class="text-gray-400 hover:text-white"><svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6l8 6-8 6V6zm10 0l8 6-8 6V6z"/></svg></button>
+         <div class="h-4 w-[1px] bg-gray-700"></div>
+         <span class="text-xs font-mono font-bold text-gray-400">{{ store.wpm }} WPM</span>
+      </div>
+
       <!-- FIX HYDRATION: Diciamo a Nuxt di renderizzarlo solo lato client -->
       <ClientOnly>
         <PdfViewer />
@@ -23,7 +44,7 @@
     <!-- DESTRA: Lettore RSVP -->
     <div 
       class="h-full flex flex-col justify-center relative bg-[#0a0a0a] transition-all duration-500"
-      :class="isZenMode ? 'w-full' : 'w-1/2'"
+      :class="isZenMode ? 'w-full' : (isFocusMode ? 'w-0 opacity-0 overflow-hidden pointer-events-none' : 'w-1/2')"
     >
       
       <!-- Pulsante Esci da Zen (visibile solo in Zen) -->
@@ -97,6 +118,15 @@
              <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 14h4v4M4 10h4V6m12 8h-4v4m4-8h-4V6M10 10l-6-6m10 10l6 6m0-16l-6 6m-4 4l-6 6"></path></svg>
              ZEN
           </button>
+          
+          <!-- Pulsante Focus Mode -->
+          <button 
+            @click="isFocusMode = true" 
+            class="transition flex flex-col items-center gap-1 text-[10px] font-bold tracking-wider text-[#555] hover:text-white"
+          >
+             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
+             FOCUS
+          </button>
         </div>
 
         <!-- Slider Velocità -->
@@ -122,8 +152,9 @@ import { onKeyStroke } from '@vueuse/core'
 const store = useRsvpStore()
 useRsvpEngine()
 
-// Stato per la Zen Mode
+// Stato per la Zen Mode e Focus Mode
 const isZenMode = ref(false)
+const isFocusMode = ref(false)
 
 // Navigazione
 const rewind = () => { store.currentIndex = Math.max(0, store.currentIndex - 10) }
@@ -135,7 +166,7 @@ onKeyStroke('ArrowLeft', () => { rewind() })
 onKeyStroke('ArrowRight', () => { forward() })
 onKeyStroke('ArrowUp', () => { store.wpm = Math.min(1000, store.wpm + 25) })
 onKeyStroke('ArrowDown', () => { store.wpm = Math.max(100, store.wpm - 25) })
-onKeyStroke('Escape', () => { isZenMode.value = false }) // Esce dallo Zen con Esc
+onKeyStroke('Escape', () => { isZenMode.value = false; isFocusMode.value = false }) // Esce dallo Zen/Focus con Esc
 
 // Calcolo ORP
 const wordParts = computed(() => {
