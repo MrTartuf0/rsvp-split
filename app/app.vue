@@ -66,14 +66,30 @@
         <div class="absolute bottom-0 w-3/4 border-b border-[#222] transition-opacity" :class="{ 'opacity-0': isZenMode && store.isPlaying }"></div>
         <div class="absolute bottom-0 w-[1px] h-6 bg-[#444] transition-opacity" :class="{ 'opacity-0': isZenMode && store.isPlaying }"></div>
 
-        <!-- Parola RSVP -->
-        <div class="flex w-full text-7xl md:text-8xl font-bold tracking-wide items-center font-[Inter,sans-serif]">
-          <div v-if="!store.currentWord" class="w-full text-center text-[#222]">Pronto</div>
-          <template v-else>
-            <div class="flex-1 text-right text-gray-300">{{ wordParts.left }}</div>
-            <div class="text-[#E62828] text-center flex-none">{{ wordParts.orp }}</div>
-            <div class="flex-1 text-left text-gray-300">{{ wordParts.right }}</div>
-          </template>
+        <!-- Parola RSVP con Contesto -->
+        <div class="flex w-full items-center justify-center">
+          
+          <!-- Main Word Container -->
+          <div class="flex w-full sm:w-[60%] lg:w-[50%] text-6xl md:text-8xl font-bold tracking-wide items-center font-[Inter,sans-serif] z-10 relative">
+            
+            <!-- Parola Precedente -->
+            <div class="absolute right-[100%] pr-6 text-2xl md:text-4xl text-gray-500/30 font-normal truncate w-[150px] md:w-[250px] text-right transition-opacity duration-300 pointer-events-none hidden sm:block" :class="{ 'opacity-0': !isZenMode }">
+               {{ prevWord }}
+            </div>
+
+            <div v-if="!store.currentWord" class="w-full text-center text-[#222]">Pronto</div>
+            <template v-else>
+              <div class="flex-1 text-right text-gray-300">{{ wordParts.left }}</div>
+              <div class="text-[#E62828] text-center flex-none">{{ wordParts.orp }}</div>
+              <div class="flex-1 text-left text-gray-300">{{ wordParts.right }}</div>
+            </template>
+
+            <!-- Parola Successiva -->
+            <div class="absolute left-[100%] pl-6 text-2xl md:text-4xl text-gray-500/30 font-normal truncate w-[150px] md:w-[250px] text-left transition-opacity duration-300 pointer-events-none hidden sm:block" :class="{ 'opacity-0': !isZenMode }">
+               {{ nextWord }}
+            </div>
+
+          </div>
         </div>
       </div>
 
@@ -189,6 +205,21 @@ const wordParts = computed(() => {
     orp: word.charAt(orpIndex),
     right: word.substring(orpIndex + 1)
   }
+})
+
+// Contesto (parola precedente e successiva)
+const prevWord = computed(() => {
+  if (store.currentIndex > 0 && store.words.length > 0) {
+    return store.words[store.currentIndex - 1]
+  }
+  return ''
+})
+
+const nextWord = computed(() => {
+  if (store.currentIndex < store.words.length - 1 && store.words.length > 0) {
+    return store.words[store.currentIndex + 1]
+  }
+  return ''
 })
 </script>
 

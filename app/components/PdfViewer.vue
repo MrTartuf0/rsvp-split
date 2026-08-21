@@ -129,7 +129,7 @@
           <canvas :ref="el => setCanvasRef(el, index)" class="absolute top-0 left-0 z-0 w-full h-full"></canvas>
           <div class="absolute top-0 left-0 w-full h-full z-10">
              <template v-if="pageData.rendered">
-               <div v-if="hasActiveWord(pageData)" class="absolute bg-[#E62828]/40 pointer-events-none rounded-[2px]" :style="getActiveWordStyle(pageData)"></div>
+               <div v-if="hasActiveWord(pageData)" id="active-pdf-word" class="absolute bg-[#E62828]/40 pointer-events-none rounded-[2px]" :style="getActiveWordStyle(pageData)"></div>
                <div v-for="(box, bIdx) in pageData.hitboxes" :key="bIdx" @click="onWordClick(box.index)" class="absolute cursor-pointer hover:bg-yellow-400/30 rounded-[2px]" :style="{ left: box.left + 'px', top: box.top + 'px', width: box.width + 'px', height: box.height + 'px' }"></div>
              </template>
           </div>
@@ -463,12 +463,14 @@ const updateMarkdownHighlight = (newIdx, oldIdx) => {
     const oldSpan = container.querySelector(`span[data-index="${oldIdx}"]`)
     if (oldSpan) {
       oldSpan.className = "cursor-pointer transition-colors rounded-sm hover:bg-yellow-400/30"
+      oldSpan.removeAttribute("id")
     }
   }
   
   const newSpan = container.querySelector(`span[data-index="${newIdx}"]`)
   if (newSpan) {
-    newSpan.className = "cursor-pointer transition-colors rounded-sm bg-[#E62828] text-white px-1"
+    newSpan.className = "cursor-pointer transition-colors rounded-sm bg-[#E62828]/40 px-1"
+    newSpan.id = "active-text-word"
   }
 }
 
@@ -497,7 +499,7 @@ watch(() => store.currentIndex, (newIdx, oldIdx) => {
       if (newSpan) {
         newSpan.classList.add('active-word')
         
-        // Auto-Scroll Intelligente
+        // Auto-Scroll Intelligente per EPUB
         if (store.isPlaying && targetContents) {
           const rect = newSpan.getBoundingClientRect()
           const viewportHeight = targetContents.window.innerHeight || window.innerHeight
@@ -508,6 +510,22 @@ watch(() => store.currentIndex, (newIdx, oldIdx) => {
         }
       }
     }
+  }
+  
+  // Auto-Scroll per PDF e Testo
+  if (store.isPlaying && (viewMode.value === 'pdf' || viewMode.value === 'text')) {
+    nextTick(() => {
+      let activeEl = null
+      if (viewMode.value === 'pdf') activeEl = document.getElementById('active-pdf-word')
+      else if (viewMode.value === 'text') activeEl = document.getElementById('active-text-word')
+      
+      if (activeEl) {
+        const rect = activeEl.getBoundingClientRect()
+        if (rect.top < window.innerHeight * 0.2 || rect.top > window.innerHeight * 0.8) {
+          activeEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        }
+      }
+    })
   }
 })
 
