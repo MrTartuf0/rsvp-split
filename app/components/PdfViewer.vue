@@ -12,8 +12,8 @@
     </div>
 
     <!-- HEADER UNIVERSALE -->
-    <div class="px-6 py-4 border-b border-[#1a1a1a] flex-shrink-0 z-20 bg-[#050505] flex justify-between items-center">
-      <div class="flex items-center gap-4">
+    <div class="px-6 py-4 border-b border-[#1a1a1a] flex-shrink-0 z-20 bg-[#050505] flex justify-between items-center gap-4">
+      <div class="flex items-center gap-6">
         <h2 class="text-xs font-bold tracking-widest text-gray-500 uppercase m-0">
           {{ viewMode.toUpperCase() }}
         </h2>
@@ -23,6 +23,24 @@
           <button @click="changeZoom(-0.2)" :disabled="!currentPdf" class="px-3 py-1 text-gray-400 hover:bg-[#222] hover:text-white transition-colors font-mono font-bold">-</button>
           <span class="px-3 py-1 text-xs text-gray-300 font-mono bg-[#1a1a1a]">{{ Math.round(zoomLevel * 100) }}%</span>
           <button @click="changeZoom(0.2)" :disabled="!currentPdf" class="px-3 py-1 text-gray-400 hover:bg-[#222] hover:text-white transition-colors font-mono font-bold">+</button>
+        </div>
+      </div>
+
+      <!-- Barra di Ricerca Custom RSVP (Visibile se file caricato) -->
+      <div v-if="viewMode !== 'idle' && viewMode !== 'paste'" class="flex items-center flex-1 max-w-md bg-[#111] rounded-lg border border-[#222] overflow-hidden px-2 py-1">
+        <svg class="w-4 h-4 text-gray-500 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+        <input 
+          ref="searchInputRef"
+          type="text" 
+          v-model="searchQuery" 
+          @keyup.enter="nextSearchResult"
+          placeholder="Cerca e sincronizza RSVP..." 
+          class="bg-transparent border-none focus:outline-none text-sm text-gray-300 px-3 py-1 w-full font-mono placeholder-gray-600"
+        />
+        <div v-if="searchResults.length > 0" class="flex items-center gap-2">
+          <span class="text-xs font-mono text-gray-500">{{ currentSearchIndex + 1 }} / {{ searchResults.length }}</span>
+          <button @click="prevSearchResult" class="p-1 text-gray-400 hover:text-white hover:bg-[#222] rounded"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path></svg></button>
+          <button @click="nextSearchResult" class="p-1 text-gray-400 hover:text-white hover:bg-[#222] rounded"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg></button>
         </div>
       </div>
 
@@ -36,13 +54,13 @@
           <span class="text-xs font-bold uppercase tracking-wider bg-[#1a1a1a] text-white py-2 px-4 rounded hover:bg-[#2a2a2a] hover:text-[#E62828] transition-colors">
             Carica File
           </span>
-          <input type="file" accept="application/pdf, text/plain, .epub, .md" @change="onFileChange" class="hidden" />
+          <input ref="fileInputRef" type="file" accept="application/pdf, text/plain, .epub, .md" @change="onFileChange" class="hidden" />
         </label>
       </div>
     </div>
 
     <!-- AREA DI CONTENUTO PRINCIPALE -->
-    <div class="flex-1 overflow-y-auto overflow-x-hidden relative flex flex-col items-center bg-[#0a0a0a] w-full p-4">
+    <div class="flex-1 overflow-hidden relative flex flex-col items-center bg-[#0a0a0a] w-full">
       
       <!-- STATO: Incolla Testo -->
       <div v-if="viewMode === 'paste'" class="w-full max-w-2xl mt-10 flex flex-col gap-4">
@@ -59,20 +77,22 @@
       </div>
 
       <!-- STATO: Testo Semplice o Markdown -->
-      <div v-else-if="viewMode === 'text'" class="w-full max-w-3xl mt-4 p-8 bg-[#111] rounded-xl shadow-2xl text-gray-300 text-lg leading-relaxed font-serif whitespace-pre-wrap markdown-container" v-html="markdownHtml" @click="handleMarkdownClick" ref="markdownContainerRef">
+      <div v-else-if="viewMode === 'text'" class="w-full h-full overflow-y-auto custom-scrollbar p-4 flex justify-center">
+        <div class="w-full max-w-3xl mt-4 p-8 bg-[#111] rounded-xl shadow-2xl text-gray-300 text-lg leading-relaxed font-serif whitespace-pre-wrap markdown-container" v-html="markdownHtml" @click="handleMarkdownClick" ref="markdownContainerRef">
+        </div>
       </div>
 
       <!-- STATO: EPUB -->
-      <div v-else-if="viewMode === 'epub'" class="w-full h-full relative bg-white shadow-2xl overflow-hidden rounded-xl flex">
+      <div v-else-if="viewMode === 'epub'" class="w-full h-full relative bg-white shadow-2xl overflow-hidden flex">
         
         <!-- SIDEBAR INDICE (a scomparsa) -->
         <div 
            class="absolute top-0 left-0 h-full bg-[#111] text-gray-300 w-80 z-40 transform transition-transform duration-300 shadow-2xl flex flex-col border-r border-[#222]"
-           :class="showEpubSidebar ? 'translate-x-0' : '-translate-x-full'"
+           :class="showSidebar ? 'translate-x-0' : '-translate-x-full'"
         >
            <div class="p-6 border-b border-[#222] flex justify-between items-center bg-[#050505]">
               <h3 class="text-white font-bold tracking-wider uppercase text-sm">Indice Capitoli</h3>
-              <button @click="showEpubSidebar = false" class="text-gray-500 hover:text-[#E62828] font-bold text-xl leading-none">×</button>
+              <button @click="showSidebar = false" class="text-gray-500 hover:text-[#E62828] font-bold text-xl leading-none">×</button>
            </div>
            <div class="flex-1 overflow-y-auto p-4 space-y-1 custom-scrollbar">
               <button 
@@ -91,20 +111,11 @@
         <!-- AREA LETTURA -->
         <div class="flex-1 w-full h-full relative flex flex-col">
            
-           <!-- TOP BAR FLUTTUANTE -->
-           <div class="absolute top-4 left-4 right-4 z-30 flex items-center gap-4 bg-white/95 backdrop-blur-md px-4 py-3 rounded-2xl shadow-lg border border-gray-100 transition-all">
-              <button @click="showEpubSidebar = !showEpubSidebar" class="text-gray-600 hover:text-[#E62828] hover:bg-gray-100 p-2 rounded-xl transition-colors">
+           <!-- PULSANTE SIDEBAR MINIMALE -->
+           <div class="absolute top-6 left-6 z-30">
+              <button @click="showSidebar = !showSidebar" class="text-gray-500 hover:text-[#E62828] bg-white/80 hover:bg-white backdrop-blur-sm p-3 rounded-xl shadow-lg border border-gray-100 transition-all">
                  <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"></path></svg>
               </button>
-              
-              <div class="flex-1 flex flex-col justify-center overflow-hidden">
-                 <span class="text-xs font-bold text-gray-800 uppercase tracking-widest truncate">{{ currentChapterName || fileName }}</span>
-                 <div class="w-full h-1.5 bg-gray-200 rounded-full mt-1.5 overflow-hidden">
-                    <div class="h-full bg-[#E62828] transition-all duration-300 rounded-full" :style="{ width: readingProgress + '%' }"></div>
-                 </div>
-              </div>
-              
-              <span class="text-xs font-mono font-bold text-[#E62828] w-12 text-right">{{ Math.round(readingProgress) }}%</span>
            </div>
 
            <div v-if="isLoading" class="absolute inset-0 z-50 flex flex-col items-center justify-center bg-white/95">
@@ -117,24 +128,60 @@
       </div>
 
       <!-- STATO: PDF -->
-      <template v-else-if="viewMode === 'pdf'">
-        <div v-if="isLoading" class="text-[#E62828] text-sm animate-pulse mt-10 font-mono uppercase tracking-widest">Elaborazione Spaziale...</div>
+      <div v-else-if="viewMode === 'pdf'" class="w-full h-full relative bg-[#0a0a0a] overflow-hidden flex">
         
+        <!-- SIDEBAR PAGINE (a scomparsa) -->
         <div 
-          v-for="(pageData, index) in pages" 
-          :key="index" 
-          class="relative mb-8 shadow-2xl bg-white flex-shrink-0" 
-          :style="{ width: pageData.cssWidth + 'px', height: pageData.cssHeight + 'px' }"
+           class="absolute top-0 left-0 h-full bg-[#111] text-gray-300 w-80 z-40 transform transition-transform duration-300 shadow-2xl flex flex-col border-r border-[#222]"
+           :class="showSidebar ? 'translate-x-0' : '-translate-x-full'"
         >
-          <canvas :ref="el => setCanvasRef(el, index)" class="absolute top-0 left-0 z-0 w-full h-full"></canvas>
-          <div class="absolute top-0 left-0 w-full h-full z-10">
-             <template v-if="pageData.rendered">
-               <div v-if="hasActiveWord(pageData)" id="active-pdf-word" class="absolute bg-[#E62828]/40 pointer-events-none rounded-[2px]" :style="getActiveWordStyle(pageData)"></div>
-               <div v-for="(box, bIdx) in pageData.hitboxes" :key="bIdx" @click="onWordClick(box.index)" class="absolute cursor-pointer hover:bg-yellow-400/30 rounded-[2px]" :style="{ left: box.left + 'px', top: box.top + 'px', width: box.width + 'px', height: box.height + 'px' }"></div>
-             </template>
-          </div>
+           <div class="p-6 border-b border-[#222] flex justify-between items-center bg-[#050505]">
+              <h3 class="text-white font-bold tracking-wider uppercase text-sm">Pagine</h3>
+              <button @click="showSidebar = false" class="text-gray-500 hover:text-[#E62828] font-bold text-xl leading-none">×</button>
+           </div>
+           <div class="flex-1 overflow-y-auto p-4 space-y-1 custom-scrollbar">
+              <button 
+                v-for="(pageData, index) in pages" 
+                :key="'nav-' + index" 
+                @click="goToPdfPage(pageData.pageNumber)"
+                class="w-full text-left py-3 px-4 rounded-lg hover:bg-[#222] hover:text-white transition-all text-sm leading-tight border-l-2 border-transparent"
+                :class="{ 'bg-[#E62828]/10 text-[#E62828] border-[#E62828] font-bold': currentPdfPage === pageData.pageNumber }"
+              >
+                Pagina {{ pageData.pageNumber }}
+              </button>
+           </div>
         </div>
-      </template>
+
+        <!-- AREA LETTURA PDF -->
+        <div class="flex-1 w-full h-full relative flex flex-col items-center overflow-y-auto custom-scrollbar p-4" id="pdf-scroll-container" @scroll="onPdfScroll">
+           
+           <!-- PULSANTE SIDEBAR MINIMALE PDF -->
+           <div class="sticky top-6 left-6 z-30 w-full flex justify-start pointer-events-none mb-8">
+              <button @click="showSidebar = !showSidebar" class="text-gray-400 hover:text-[#E62828] bg-[#111]/80 hover:bg-[#222] backdrop-blur-sm p-3 rounded-xl shadow-lg border border-[#222] transition-all pointer-events-auto ml-6">
+                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"></path></svg>
+              </button>
+           </div>
+
+           <div v-if="isLoading" class="text-[#E62828] text-sm animate-pulse mb-8 font-mono uppercase tracking-widest">Elaborazione Spaziale...</div>
+           
+           <div 
+             v-for="(pageData, index) in pages" 
+             :key="index" 
+             :id="'pdf-page-' + pageData.pageNumber"
+             class="relative mb-8 shadow-2xl bg-white flex-shrink-0" 
+             :style="{ width: pageData.cssWidth + 'px', height: pageData.cssHeight + 'px' }"
+           >
+             <canvas :ref="el => setCanvasRef(el, index)" class="absolute top-0 left-0 z-0 w-full h-full"></canvas>
+             <div class="absolute top-0 left-0 w-full h-full z-10">
+                <div :id="'text-layer-' + pageData.pageNumber" class="textLayer"></div>
+                <template v-if="pageData.rendered">
+                  <div v-if="hasActiveWord(pageData)" id="active-pdf-word" class="absolute bg-[#E62828]/40 pointer-events-none rounded-[2px]" :style="getActiveWordStyle(pageData)"></div>
+                  <div v-for="(box, bIdx) in pageData.hitboxes" :key="bIdx" @click="onWordClick(box.index)" class="absolute cursor-pointer hover:bg-yellow-400/30 rounded-[2px]" :style="{ left: box.left + 'px', top: box.top + 'px', width: box.width + 'px', height: box.height + 'px' }"></div>
+                </template>
+             </div>
+           </div>
+        </div>
+      </div>
 
       <!-- STATO: Vuoto -->
       <div v-else-if="viewMode === 'idle'" class="m-auto text-center text-gray-600 flex flex-col items-center gap-4">
@@ -147,7 +194,7 @@
 </template>
 
 <script setup>
-import { ref, nextTick, markRaw, watch } from 'vue'
+import { ref, nextTick, markRaw, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRsvpStore } from '~/stores/rsvp'
 import { marked } from 'marked'
 
@@ -158,6 +205,48 @@ const viewMode = ref('idle')
 const isDragging = ref(false)
 const isLoading = ref(false)
 const fileName = ref('')
+
+// Stati Ricerca Custom RSVP
+const searchQuery = ref('')
+const searchResults = ref([])
+const currentSearchIndex = ref(0)
+const searchInputRef = ref(null)
+const fileInputRef = ref(null)
+
+// Event listeners spostati in basso
+watch(searchQuery, (newVal) => {
+  if (!newVal || newVal.trim() === '') {
+    searchResults.value = []
+    currentSearchIndex.value = 0
+    return
+  }
+  const q = newVal.toLowerCase()
+  searchResults.value = store.words.reduce((acc, word, idx) => {
+    if (word && word.toLowerCase().includes(q)) acc.push(idx)
+    return acc
+  }, [])
+  currentSearchIndex.value = 0
+  if (searchResults.value.length > 0 && !store.isPlaying) {
+    store.currentIndex = searchResults.value[0]
+  }
+})
+
+const nextSearchResult = () => {
+  if (searchResults.value.length === 0) return
+  currentSearchIndex.value = (currentSearchIndex.value + 1) % searchResults.value.length
+  store.currentIndex = searchResults.value[currentSearchIndex.value]
+  if (store.isPlaying) store.isPlaying = false
+}
+
+const prevSearchResult = () => {
+  if (searchResults.value.length === 0) return
+  currentSearchIndex.value = (currentSearchIndex.value - 1 + searchResults.value.length) % searchResults.value.length
+  store.currentIndex = searchResults.value[currentSearchIndex.value]
+  if (store.isPlaying) store.isPlaying = false
+}
+
+const currentPdfPage = ref(1)
+const showSidebar = ref(false)
 
 // Stati PDF
 const pages = ref([])
@@ -176,6 +265,47 @@ const currentEpub = ref(null)
 const epubRendition = ref(null)
 const epubToc = ref([])
 const currentChapterName = ref('')
+
+const goToPdfPage = (pageNumber) => {
+  const el = document.getElementById('pdf-page-' + pageNumber)
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth' })
+    if (window.innerWidth < 768) showSidebar.value = false
+    
+    // Sincronizza RSVP alla prima parola della pagina
+    const page = pages.value.find(p => p.pageNumber === pageNumber)
+    if (page && page.hitboxes.length > 0) {
+      store.currentIndex = page.hitboxes[0].index
+    }
+  }
+}
+
+let pdfScrollTimeout = null
+const onPdfScroll = (e) => {
+  if (pdfScrollTimeout) clearTimeout(pdfScrollTimeout)
+  pdfScrollTimeout = setTimeout(() => {
+    const container = e.target
+    const scrollCenter = container.scrollTop + container.clientHeight / 2
+    
+    let closestPage = 1
+    let minDiff = Infinity
+    
+    for (const page of pages.value) {
+      const el = document.getElementById('pdf-page-' + page.pageNumber)
+      if (el) {
+        const offsetTop = el.offsetTop - container.offsetTop
+        const center = offsetTop + el.clientHeight / 2
+        const diff = Math.abs(center - scrollCenter)
+        if (diff < minDiff) {
+          minDiff = diff
+          closestPage = page.pageNumber
+        }
+      }
+    }
+    
+    currentPdfPage.value = closestPage
+  }, 100)
+}
 const readingProgress = ref(0)
 const showEpubSidebar = ref(false)
 
@@ -513,7 +643,7 @@ watch(() => store.currentIndex, (newIdx, oldIdx) => {
   }
   
   // Auto-Scroll per PDF e Testo
-  if (store.isPlaying && (viewMode.value === 'pdf' || viewMode.value === 'text')) {
+  if (viewMode.value === 'pdf' || viewMode.value === 'text') {
     nextTick(() => {
       let activeEl = null
       if (viewMode.value === 'pdf') activeEl = document.getElementById('active-pdf-word')
@@ -614,27 +744,181 @@ const processPdfDocument = async (pdf, reloadText = true) => {
         physicalWidth: Math.floor(viewport.width * (window.devicePixelRatio || 1)),
         physicalHeight: Math.floor(viewport.height * (window.devicePixelRatio || 1)),
         transform: (window.devicePixelRatio || 1) !== 1 ? [(window.devicePixelRatio || 1), 0, 0, (window.devicePixelRatio || 1), 0, 0] : null,
-        hitboxes: pageHitboxes, viewport, pageObject: markRaw(page), rendered: false
+        hitboxes: pageHitboxes, viewport, textContent: markRaw(textContent), pageObject: markRaw(page), rendered: false
       })
     }
-    if (reloadText) store.loadText(globalWordArray.join(' '))
+    if (reloadText) {
+      store.loadText(globalWordArray.join(' '))
+    }
+    currentPdfPage.value = 1
     setTimeout(() => renderPages(), 150)
   } finally { isLoading.value = false }
 }
 
 const renderPages = async () => {
   await nextTick()
+  let pdfjsLib
+  try { pdfjsLib = await import('pdfjs-dist') } catch {}
+
   for (let i = 0; i < pages.value.length; i++) {
     const p = pages.value[i]
     if (!canvasRefs.value[i]) continue
     canvasRefs.value[i].width = p.physicalWidth
     canvasRefs.value[i].height = p.physicalHeight
-    try { await p.pageObject.render({ canvasContext: canvasRefs.value[i].getContext('2d'), transform: p.transform, viewport: p.viewport }).promise; p.rendered = true } catch {}
+    try { 
+      await p.pageObject.render({ canvasContext: canvasRefs.value[i].getContext('2d'), transform: p.transform, viewport: p.viewport }).promise; 
+      p.rendered = true 
+      
+      const textLayerDiv = document.getElementById('text-layer-' + p.pageNumber)
+      if (textLayerDiv && p.textContent && pdfjsLib && pdfjsLib.renderTextLayer) {
+        textLayerDiv.innerHTML = '' // Clear if re-rendering
+        pdfjsLib.renderTextLayer({
+          textContentSource: p.textContent,
+          container: textLayerDiv,
+          viewport: p.viewport,
+          textDivs: []
+        })
+      }
+    } catch {}
   }
 }
+
+const handleKeyDown = (e) => {
+  if (e.key === 'Escape') {
+    if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
+      document.activeElement.blur()
+      return
+    }
+  }
+
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'f') {
+    e.preventDefault()
+    if (searchInputRef.value) searchInputRef.value.focus()
+    return
+  }
+  
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'o') {
+    e.preventDefault()
+    if (fileInputRef.value) fileInputRef.value.click()
+    return
+  }
+
+  // Ignora le shortcut Vim se stiamo scrivendo nella search bar o nell'area paste
+  if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return
+  if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return // Solo tasti lisci
+  
+  const scrollAmount = 150
+  
+  let container = null
+  if (viewMode.value === 'pdf') container = document.getElementById('pdf-scroll-container')
+  else if (viewMode.value === 'text') container = markdownContainerRef.value?.parentElement
+  else if (viewMode.value === 'epub') container = epubContainerRef.value
+
+  if (!container) return
+
+  if (e.key === 'j') {
+    jumpLine(1)
+  } else if (e.key === 'k') {
+    jumpLine(-1)
+  } else if (e.key === 'u' && viewMode.value === 'pdf') {
+    const prevPage = Math.max(1, currentPdfPage.value - 1)
+    goToPdfPage(prevPage)
+  } else if (e.key === 'd' && viewMode.value === 'pdf') {
+    const nextPage = Math.min(pages.value.length, currentPdfPage.value + 1)
+    goToPdfPage(nextPage)
+  }
+}
+
+const jumpLine = (direction) => {
+  if (store.isPlaying) store.isPlaying = false
+
+  if (viewMode.value === 'pdf' && pages.value.length > 0) {
+    let currentBox = null
+    let pageIndex = -1
+    for (let i = 0; i < pages.value.length; i++) {
+      const p = pages.value[i]
+      if (!p.hitboxes) continue
+      const b = p.hitboxes.find(h => h.index === store.currentIndex)
+      if (b) {
+        currentBox = b
+        pageIndex = i
+        break
+      }
+    }
+    
+    if (currentBox) {
+      if (direction === 1) {
+        for (let i = pageIndex; i < pages.value.length; i++) {
+          const p = pages.value[i]
+          for (const b of p.hitboxes) {
+             if (b.index <= currentBox.index) continue
+             if (i > pageIndex || b.top > currentBox.top + 5) {
+                store.currentIndex = b.index
+                return
+             }
+          }
+        }
+      } else {
+        for (let i = pageIndex; i >= 0; i--) {
+          const p = pages.value[i]
+          if (!p.hitboxes) continue
+          for (let j = p.hitboxes.length - 1; j >= 0; j--) {
+             const b = p.hitboxes[j]
+             if (b.index >= currentBox.index) continue
+             if (i < pageIndex || b.top < currentBox.top - 5) {
+                const targetTop = b.top
+                let firstWordOfLine = b
+                for (let k = j; k >= 0; k--) {
+                   if (Math.abs(p.hitboxes[k].top - targetTop) < 5) {
+                      firstWordOfLine = p.hitboxes[k]
+                   } else break
+                }
+                store.currentIndex = firstWordOfLine.index
+                return
+             }
+          }
+        }
+      }
+    }
+  }
+  
+  // Fallback (Text/EPUB)
+  store.currentIndex = Math.max(0, Math.min(store.words.length - 1, store.currentIndex + (direction * 12)))
+
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', handleKeyDown)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handleKeyDown)
+})
 </script>
 
 <style>
+/* PDF TextLayer - per Cmd+F e selezione testo nativa */
+.textLayer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+  line-height: 1.0;
+  z-index: 5;
+}
+.textLayer > span {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+}
+.textLayer ::selection {
+  background: rgba(0, 0, 255, 0.2);
+}
+
 /* CSS addizionale per gli elementi Markdown */
 .markdown-container h1 { font-size: 2.25rem; font-weight: bold; margin-bottom: 1rem; color: #fff; }
 .markdown-container h2 { font-size: 1.875rem; font-weight: bold; margin-bottom: 0.75rem; color: #fff; }

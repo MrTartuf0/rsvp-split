@@ -70,7 +70,10 @@
         <div class="flex w-full items-center justify-center">
           
           <!-- Main Word Container -->
-          <div class="flex w-full sm:w-[60%] lg:w-[50%] text-6xl md:text-8xl font-bold tracking-wide items-center font-[Inter,sans-serif] z-10 relative">
+          <div 
+            class="flex w-full sm:w-[80%] lg:w-[70%] font-bold tracking-wide items-center font-[Inter,sans-serif] z-10 relative whitespace-nowrap transition-all duration-300"
+            :class="isZenMode ? 'text-6xl md:text-8xl' : 'text-4xl md:text-6xl'"
+          >
             
             <!-- Parola Precedente -->
             <div class="absolute right-[100%] pr-6 text-2xl md:text-4xl text-gray-500/30 font-normal truncate w-[150px] md:w-[250px] text-right transition-opacity duration-300 pointer-events-none hidden sm:block" :class="{ 'opacity-0': !isZenMode }">
@@ -173,15 +176,23 @@ const isZenMode = ref(false)
 const isFocusMode = ref(false)
 
 // Navigazione
-const rewind = () => { store.currentIndex = Math.max(0, store.currentIndex - 10) }
-const forward = () => { store.currentIndex = Math.min(store.words.length - 1, store.currentIndex + 10) }
+const rewindWords = (count) => { store.currentIndex = Math.max(0, store.currentIndex - count) }
+const forwardWords = (count) => { store.currentIndex = Math.min(store.words.length - 1, store.currentIndex + count) }
+
+const ignoreIfInput = (e) => {
+  return ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)
+}
 
 // Tasti
-onKeyStroke(' ', (e) => { e.preventDefault(); store.togglePlay() })
-onKeyStroke('ArrowLeft', () => { rewind() })
-onKeyStroke('ArrowRight', () => { forward() })
-onKeyStroke('ArrowUp', () => { store.wpm = Math.min(1000, store.wpm + 25) })
-onKeyStroke('ArrowDown', () => { store.wpm = Math.max(100, store.wpm - 25) })
+onKeyStroke(' ', (e) => { if (ignoreIfInput(e)) return; e.preventDefault(); store.togglePlay() })
+onKeyStroke('ArrowLeft', (e) => { if (ignoreIfInput(e)) return; rewindWords(1) })
+onKeyStroke('ArrowRight', (e) => { if (ignoreIfInput(e)) return; forwardWords(1) })
+onKeyStroke('h', (e) => { if (ignoreIfInput(e)) return; rewindWords(1) })
+onKeyStroke('l', (e) => { if (ignoreIfInput(e)) return; forwardWords(1) })
+onKeyStroke('H', (e) => { if (ignoreIfInput(e)) return; rewindWords(10) })
+onKeyStroke('L', (e) => { if (ignoreIfInput(e)) return; forwardWords(10) })
+onKeyStroke('ArrowUp', (e) => { if (ignoreIfInput(e)) return; store.wpm = Math.min(1000, store.wpm + 25) })
+onKeyStroke('ArrowDown', (e) => { if (ignoreIfInput(e)) return; store.wpm = Math.max(100, store.wpm - 25) })
 onKeyStroke('Escape', () => { isZenMode.value = false; isFocusMode.value = false }) // Esce dallo Zen/Focus con Esc
 
 // Calcolo ORP
